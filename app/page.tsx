@@ -57,6 +57,36 @@ type ResumeResult = {
   disclaimer: string;
 };
 
+type ProjectSuggestion = {
+  project_name: string;
+  description: string;
+  skills_covered: string[];
+  difficulty: string;
+  portfolio_value: string;
+};
+
+type ResourceRecommendation = {
+  topic: string;
+  resource_type: string;
+  what_to_search: string;
+  expected_outcome: string;
+};
+
+type LearningPlanResult = {
+  target_role: string;
+  learning_goal: string;
+  readiness_level: string;
+  readiness_summary: string;
+  revision_topics: string[];
+  new_skills_to_learn: string[];
+  project_suggestions: ProjectSuggestion[];
+  interview_prep_topics: string[];
+  resource_recommendations: ResourceRecommendation[];
+  weekly_learning_plan: Record<string, string[]>;
+  job_readiness_checklist: string[];
+  disclaimer: string;
+};
+
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
 
@@ -66,9 +96,7 @@ const textAreaClass =
 const labelClass = "mb-1 block text-sm font-medium text-slate-700";
 
 function normalizeGrowthPaths(data: any): GrowthPath[] {
-  if (!Array.isArray(data)) {
-    return [];
-  }
+  if (!Array.isArray(data)) return [];
 
   return data.map((path) => ({
     path_name: path?.path_name || "Career Growth Path",
@@ -89,19 +117,15 @@ function normalizeCareerResult(data: any): CareerResult {
   return {
     role_cluster: data?.role_cluster || "Unknown",
     current_level: data?.current_level || "Not available",
-
     summary:
       data?.summary ||
       "Summary is not available for this analysis. Please try again.",
-
     recommended_next_move:
       data?.recommended_next_move ||
       "Recommended next move is not available for this analysis.",
-
     goal_strategy:
       data?.goal_strategy ||
       "Goal-specific strategy is not available for this analysis.",
-
     salary_insight: {
       current_salary_lpa: Number(salaryInsight.current_salary_lpa || 0),
       market_min_lpa: Number(salaryInsight.market_min_lpa || 0),
@@ -109,38 +133,28 @@ function normalizeCareerResult(data: any): CareerResult {
       salary_gap_lpa: salaryInsight.salary_gap_lpa || "Not available",
       confidence: salaryInsight.confidence || "Not available",
     },
-
     target_roles: Array.isArray(data?.target_roles) ? data.target_roles : [],
-
     top_skill_gaps: Array.isArray(data?.top_skill_gaps)
       ? data.top_skill_gaps
       : [],
-
     skill_salary_impact:
-      data?.skill_salary_impact &&
-      typeof data.skill_salary_impact === "object"
+      data?.skill_salary_impact && typeof data.skill_salary_impact === "object"
         ? data.skill_salary_impact
         : {},
-
     growth_paths: normalizeGrowthPaths(data?.growth_paths),
-
     why_recommendations: Array.isArray(data?.why_recommendations)
       ? data.why_recommendations
       : [],
-
     roadmap_4_weeks:
       data?.roadmap_4_weeks && typeof data.roadmap_4_weeks === "object"
         ? data.roadmap_4_weeks
         : {},
-
     resume_suggestions: Array.isArray(data?.resume_suggestions)
       ? data.resume_suggestions
       : [],
-
     confidence_notes: Array.isArray(data?.confidence_notes)
       ? data.confidence_notes
       : [],
-
     disclaimer:
       data?.disclaimer ||
       "This is an AI-assisted estimate and not a guaranteed salary prediction.",
@@ -152,8 +166,7 @@ function normalizeResumeResult(data: any): ResumeResult {
     target_role: data?.target_role || "Target role not available",
     resume_alignment: data?.resume_alignment || "Medium",
     alignment_summary:
-      data?.alignment_summary ||
-      "Resume alignment summary is not available.",
+      data?.alignment_summary || "Resume alignment summary is not available.",
     improved_profile_summary:
       data?.improved_profile_summary ||
       "Improved profile summary is not available.",
@@ -184,30 +197,86 @@ function normalizeResumeResult(data: any): ResumeResult {
   };
 }
 
+function normalizeLearningPlanResult(data: any): LearningPlanResult {
+  return {
+    target_role: data?.target_role || "Target role not available",
+    learning_goal: data?.learning_goal || "Learning goal not available",
+    readiness_level: data?.readiness_level || "Medium",
+    readiness_summary:
+      data?.readiness_summary ||
+      "Readiness summary is not available for this plan.",
+    revision_topics: Array.isArray(data?.revision_topics)
+      ? data.revision_topics
+      : [],
+    new_skills_to_learn: Array.isArray(data?.new_skills_to_learn)
+      ? data.new_skills_to_learn
+      : [],
+    project_suggestions: Array.isArray(data?.project_suggestions)
+      ? data.project_suggestions.map((project: any) => ({
+          project_name: project?.project_name || "Project suggestion",
+          description:
+            project?.description || "Project description is not available.",
+          skills_covered: Array.isArray(project?.skills_covered)
+            ? project.skills_covered
+            : [],
+          difficulty: project?.difficulty || "Medium",
+          portfolio_value:
+            project?.portfolio_value ||
+            "This project can help demonstrate practical skills.",
+        }))
+      : [],
+    interview_prep_topics: Array.isArray(data?.interview_prep_topics)
+      ? data.interview_prep_topics
+      : [],
+    resource_recommendations: Array.isArray(data?.resource_recommendations)
+      ? data.resource_recommendations.map((resource: any) => ({
+          topic: resource?.topic || "Learning topic",
+          resource_type:
+            resource?.resource_type ||
+            "YouTube / documentation / course / practice",
+          what_to_search:
+            resource?.what_to_search || "Search for relevant learning material",
+          expected_outcome:
+            resource?.expected_outcome ||
+            "Understand and apply this topic practically.",
+        }))
+      : [],
+    weekly_learning_plan:
+      data?.weekly_learning_plan && typeof data.weekly_learning_plan === "object"
+        ? data.weekly_learning_plan
+        : {},
+    job_readiness_checklist: Array.isArray(data?.job_readiness_checklist)
+      ? data.job_readiness_checklist
+      : [],
+    disclaimer:
+      data?.disclaimer ||
+      "This is an AI-generated learning plan. Please adapt it to your time and target role.",
+  };
+}
+
 function getFitScoreStyle(score: string) {
-  const normalizedScore = score.toLowerCase();
+  const normalized = score.toLowerCase();
 
-  if (normalizedScore.includes("high")) {
-    return "bg-emerald-100 text-emerald-800";
-  }
-
-  if (normalizedScore.includes("low")) {
-    return "bg-rose-100 text-rose-800";
-  }
+  if (normalized.includes("high")) return "bg-emerald-100 text-emerald-800";
+  if (normalized.includes("low")) return "bg-rose-100 text-rose-800";
 
   return "bg-amber-100 text-amber-800";
 }
 
 function getAlignmentStyle(alignment: string) {
-  const normalizedAlignment = alignment.toLowerCase();
+  const normalized = alignment.toLowerCase();
 
-  if (normalizedAlignment.includes("high")) {
-    return "bg-emerald-100 text-emerald-800";
-  }
+  if (normalized.includes("high")) return "bg-emerald-100 text-emerald-800";
+  if (normalized.includes("low")) return "bg-rose-100 text-rose-800";
 
-  if (normalizedAlignment.includes("low")) {
-    return "bg-rose-100 text-rose-800";
-  }
+  return "bg-amber-100 text-amber-800";
+}
+
+function getReadinessStyle(readiness: string) {
+  const normalized = readiness.toLowerCase();
+
+  if (normalized.includes("high")) return "bg-emerald-100 text-emerald-800";
+  if (normalized.includes("low")) return "bg-rose-100 text-rose-800";
 
   return "bg-amber-100 text-amber-800";
 }
@@ -225,12 +294,19 @@ export default function Home() {
   const [result, setResult] = useState<CareerResult | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const [activeView, setActiveView] = useState<"career" | "resume">("career");
+  const [activeView, setActiveView] = useState<
+    "career" | "resume" | "learning"
+  >("career");
 
   const [resumeText, setResumeText] = useState("");
   const [resumeTargetRole, setResumeTargetRole] = useState("");
   const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
   const [resumeLoading, setResumeLoading] = useState(false);
+
+  const [learningTargetRole, setLearningTargetRole] = useState("");
+  const [learningResult, setLearningResult] =
+    useState<LearningPlanResult | null>(null);
+  const [learningLoading, setLearningLoading] = useState(false);
 
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
@@ -246,6 +322,12 @@ export default function Home() {
     setResumeTargetRole("");
     setResumeResult(null);
     setResumeLoading(false);
+  };
+
+  const resetLearningState = () => {
+    setLearningTargetRole("");
+    setLearningResult(null);
+    setLearningLoading(false);
   };
 
   const analyzeCareer = async () => {
@@ -264,6 +346,7 @@ export default function Home() {
     setResult(null);
     setActiveView("career");
     resetResumeState();
+    resetLearningState();
 
     const payload = {
       current_role: form.current_role.trim(),
@@ -288,20 +371,28 @@ export default function Home() {
 
       if (safeResult.target_roles.length > 0) {
         setResumeTargetRole(safeResult.target_roles[0]);
+        setLearningTargetRole(safeResult.target_roles[0]);
       }
     } catch (error: any) {
       console.error("Career analysis failed:", error);
-
       const message =
         error?.response?.data?.detail ||
         error?.message ||
         "Something went wrong. Please try again.";
-
       alert(message);
     } finally {
       setLoading(false);
     }
   };
+
+  const allTargetRoles = result
+    ? Array.from(
+        new Set([
+          ...result.target_roles,
+          ...result.growth_paths.flatMap((path) => path.target_roles),
+        ])
+      )
+    : [];
 
   const optimizeResume = async () => {
     if (!result) {
@@ -346,30 +437,60 @@ export default function Home() {
         payload
       );
 
-      const safeResumeResult = normalizeResumeResult(res.data);
-      setResumeResult(safeResumeResult);
+      setResumeResult(normalizeResumeResult(res.data));
     } catch (error: any) {
       console.error("Resume optimization failed:", error);
-
       const message =
         error?.response?.data?.detail ||
         error?.message ||
         "Resume optimization failed. Please try again.";
-
       alert(message);
     } finally {
       setResumeLoading(false);
     }
   };
 
-  const allTargetRoles = result
-    ? Array.from(
-        new Set([
-          ...result.target_roles,
-          ...result.growth_paths.flatMap((path) => path.target_roles),
-        ])
-      )
-    : [];
+  const generateLearningPlan = async () => {
+    if (!result) {
+      alert("Please generate career analysis first.");
+      return;
+    }
+
+    if (!learningTargetRole.trim()) {
+      alert("Please select or enter a target role.");
+      return;
+    }
+
+    setLearningLoading(true);
+    setLearningResult(null);
+
+    const payload = {
+      current_role: form.current_role.trim(),
+      experience_years: Number(form.experience_years),
+      city: form.city.trim(),
+      skills: form.skills
+        .split(",")
+        .map((skill) => skill.trim())
+        .filter(Boolean),
+      goal: form.goal,
+      target_role: learningTargetRole.trim(),
+      skill_gaps: result.top_skill_gaps || [],
+    };
+
+    try {
+      const res = await axios.post(`${apiBaseUrl}/api/learning/plan`, payload);
+      setLearningResult(normalizeLearningPlanResult(res.data));
+    } catch (error: any) {
+      console.error("Learning plan generation failed:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Learning plan generation failed. Please try again.";
+      alert(message);
+    } finally {
+      setLearningLoading(false);
+    }
+  };
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 sm:py-8">
@@ -380,12 +501,12 @@ export default function Home() {
           </p>
 
           <h1 className="mb-4 max-w-3xl text-3xl font-bold leading-tight sm:text-4xl">
-            Find your salary gap and get a personalized career growth path.
+            Find your salary gap and build your career execution plan.
           </h1>
 
           <p className="max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-            Analyze your profile, explore growth paths, and improve your resume
-            for your target role.
+            Analyze your profile, explore growth paths, optimize your resume,
+            and generate a learning plan for your target role.
           </p>
         </section>
 
@@ -501,7 +622,7 @@ export default function Home() {
                   </h2>
                   <p className="mx-auto max-w-md text-sm leading-6 text-slate-500 sm:text-base">
                     Fill the form and generate your career report. Resume
-                    optimizer will unlock after analysis.
+                    optimizer and learning plan will unlock after analysis.
                   </p>
                 </div>
               </div>
@@ -525,7 +646,7 @@ export default function Home() {
             {result && (
               <div className="space-y-6">
                 <div className="rounded-3xl bg-white p-3 shadow">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                     <button
                       onClick={() => setActiveView("career")}
                       className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
@@ -546,6 +667,17 @@ export default function Home() {
                       }`}
                     >
                       Resume Optimizer
+                    </button>
+
+                    <button
+                      onClick={() => setActiveView("learning")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                        activeView === "learning"
+                          ? "bg-slate-950 text-white"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      Learning Plan
                     </button>
                   </div>
                 </div>
@@ -664,36 +796,48 @@ export default function Home() {
                                   <p className="mb-2 text-sm font-semibold text-slate-900">
                                     Target Roles
                                   </p>
-                                  <ul className="space-y-2">
-                                    {path.target_roles.map(
-                                      (role, roleIndex) => (
-                                        <li
-                                          key={roleIndex}
-                                          className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                        >
-                                          {role}
-                                        </li>
-                                      )
-                                    )}
-                                  </ul>
+                                  {path.target_roles.length === 0 ? (
+                                    <p className="text-sm text-slate-500">
+                                      No roles available.
+                                    </p>
+                                  ) : (
+                                    <ul className="space-y-2">
+                                      {path.target_roles.map(
+                                        (role, roleIndex) => (
+                                          <li
+                                            key={roleIndex}
+                                            className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                                          >
+                                            {role}
+                                          </li>
+                                        )
+                                      )}
+                                    </ul>
+                                  )}
                                 </div>
 
                                 <div>
                                   <p className="mb-2 text-sm font-semibold text-slate-900">
                                     Skills to Build
                                   </p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {path.skills_to_build.map(
-                                      (skill, skillIndex) => (
-                                        <span
-                                          key={skillIndex}
-                                          className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
-                                        >
-                                          {skill}
-                                        </span>
-                                      )
-                                    )}
-                                  </div>
+                                  {path.skills_to_build.length === 0 ? (
+                                    <p className="text-sm text-slate-500">
+                                      No skills available.
+                                    </p>
+                                  ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                      {path.skills_to_build.map(
+                                        (skill, skillIndex) => (
+                                          <span
+                                            key={skillIndex}
+                                            className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                          >
+                                            {skill}
+                                          </span>
+                                        )
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -707,22 +851,28 @@ export default function Home() {
                         High-ROI Skill Gaps
                       </h3>
 
-                      <div className="space-y-3">
-                        {result.top_skill_gaps.map((skill, index) => (
-                          <div
-                            key={index}
-                            className="rounded-2xl border border-slate-200 p-4"
-                          >
-                            <p className="font-semibold text-slate-900">
-                              {skill}
-                            </p>
-                            <p className="mt-1 text-sm leading-6 text-slate-600">
-                              {result.skill_salary_impact[skill] ||
-                                "This skill can improve your employability for better-paying roles."}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
+                      {result.top_skill_gaps.length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                          No skill gaps available.
+                        </p>
+                      ) : (
+                        <div className="space-y-3">
+                          {result.top_skill_gaps.map((skill, index) => (
+                            <div
+                              key={index}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <p className="font-semibold text-slate-900">
+                                {skill}
+                              </p>
+                              <p className="mt-1 text-sm leading-6 text-slate-600">
+                                {result.skill_salary_impact[skill] ||
+                                  "This skill can improve your employability for better-paying roles."}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="rounded-3xl bg-slate-900 p-5 text-white shadow sm:p-6">
@@ -730,16 +880,22 @@ export default function Home() {
                         Why These Recommendations?
                       </h3>
 
-                      <ul className="space-y-3">
-                        {result.why_recommendations.map((reason, index) => (
-                          <li
-                            key={index}
-                            className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-slate-100"
-                          >
-                            {reason}
-                          </li>
-                        ))}
-                      </ul>
+                      {result.why_recommendations.length === 0 ? (
+                        <p className="text-sm text-slate-300">
+                          Explanation is not available.
+                        </p>
+                      ) : (
+                        <ul className="space-y-3">
+                          {result.why_recommendations.map((reason, index) => (
+                            <li
+                              key={index}
+                              className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-slate-100"
+                            >
+                              {reason}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
 
                     <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
@@ -747,68 +903,71 @@ export default function Home() {
                         4-Week Action Roadmap
                       </h3>
 
-                      <div className="space-y-4">
-                        {Object.entries(result.roadmap_4_weeks).map(
-                          ([week, tasks]) => (
-                            <div
-                              key={week}
-                              className="rounded-2xl border border-slate-200 p-4"
-                            >
-                              <p className="mb-2 font-bold text-slate-900">
-                                {week.replace("_", " ").toUpperCase()}
-                              </p>
-                              <ul className="space-y-2">
-                                {(tasks || []).map((task, index) => (
-                                  <li
-                                    key={index}
-                                    className="flex gap-2 text-sm leading-6 text-slate-600"
-                                  >
-                                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900"></span>
-                                    <span>{task}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          )
-                        )}
+                      {Object.keys(result.roadmap_4_weeks).length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                          Roadmap is not available.
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          {Object.entries(result.roadmap_4_weeks).map(
+                            ([week, tasks]) => (
+                              <div
+                                key={week}
+                                className="rounded-2xl border border-slate-200 p-4"
+                              >
+                                <p className="mb-2 font-bold text-slate-900">
+                                  {week.replace("_", " ").toUpperCase()}
+                                </p>
+                                <ul className="space-y-2">
+                                  {(tasks || []).map((task, index) => (
+                                    <li
+                                      key={index}
+                                      className="flex gap-2 text-sm leading-6 text-slate-600"
+                                    >
+                                      <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900"></span>
+                                      <span>{task}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
+                        <h3 className="mb-2 text-xl font-bold text-indigo-950">
+                          Improve your resume
+                        </h3>
+                        <p className="mb-4 text-sm leading-6 text-indigo-900">
+                          Rewrite your profile summary, resume bullets, Naukri
+                          headline and LinkedIn summary for your target role.
+                        </p>
+                        <button
+                          onClick={() => setActiveView("resume")}
+                          className="rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white transition hover:bg-indigo-800"
+                        >
+                          Go to Resume Optimizer
+                        </button>
                       </div>
-                    </div>
 
-                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                      <h3 className="mb-4 text-xl font-bold text-slate-900">
-                        Resume Suggestions
-                      </h3>
-
-                      <ul className="space-y-3">
-                        {result.resume_suggestions.map(
-                          (suggestion, index) => (
-                            <li
-                              key={index}
-                              className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"
-                            >
-                              {suggestion}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    </div>
-
-                    <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
-                      <h3 className="mb-2 text-xl font-bold text-indigo-950">
-                        Ready to improve your resume?
-                      </h3>
-                      <p className="mb-4 text-sm leading-6 text-indigo-900">
-                        Use the Resume Optimizer to rewrite your profile summary,
-                        bullets, Naukri headline and LinkedIn summary for your
-                        target role.
-                      </p>
-
-                      <button
-                        onClick={() => setActiveView("resume")}
-                        className="rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white transition hover:bg-indigo-800"
-                      >
-                        Go to Resume Optimizer
-                      </button>
+                      <div className="rounded-3xl bg-cyan-50 p-5 shadow-sm sm:p-6">
+                        <h3 className="mb-2 text-xl font-bold text-cyan-950">
+                          Build your learning plan
+                        </h3>
+                        <p className="mb-4 text-sm leading-6 text-cyan-900">
+                          Get revision topics, new skills, project ideas,
+                          interview prep and resource guidance.
+                        </p>
+                        <button
+                          onClick={() => setActiveView("learning")}
+                          className="rounded-xl bg-cyan-700 px-5 py-3 font-semibold text-white transition hover:bg-cyan-800"
+                        >
+                          Go to Learning Plan
+                        </button>
+                      </div>
                     </div>
 
                     <div className="rounded-3xl bg-amber-50 p-5 sm:p-6">
@@ -816,16 +975,22 @@ export default function Home() {
                         Confidence Notes
                       </h3>
 
-                      <ul className="space-y-2">
-                        {result.confidence_notes.map((note, index) => (
-                          <li
-                            key={index}
-                            className="text-sm leading-6 text-amber-900"
-                          >
-                            • {note}
-                          </li>
-                        ))}
-                      </ul>
+                      {result.confidence_notes.length === 0 ? (
+                        <p className="text-sm text-amber-900">
+                          Confidence notes are not available.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {result.confidence_notes.map((note, index) => (
+                            <li
+                              key={index}
+                              className="text-sm leading-6 text-amber-900"
+                            >
+                              • {note}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
 
                       <p className="mt-4 text-sm leading-6 text-amber-900">
                         {result.disclaimer}
@@ -1010,18 +1175,24 @@ export default function Home() {
                               Missing Keywords
                             </h3>
 
-                            <div className="flex flex-wrap gap-2">
-                              {resumeResult.missing_keywords.map(
-                                (keyword, index) => (
-                                  <span
-                                    key={index}
-                                    className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
-                                  >
-                                    {keyword}
-                                  </span>
-                                )
-                              )}
-                            </div>
+                            {resumeResult.missing_keywords.length === 0 ? (
+                              <p className="text-sm text-slate-500">
+                                No missing keywords available.
+                              </p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {resumeResult.missing_keywords.map(
+                                  (keyword, index) => (
+                                    <span
+                                      key={index}
+                                      className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                    >
+                                      {keyword}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
@@ -1029,18 +1200,25 @@ export default function Home() {
                               Improvement Priorities
                             </h3>
 
-                            <ul className="space-y-2">
-                              {resumeResult.resume_improvement_priorities.map(
-                                (priority, index) => (
-                                  <li
-                                    key={index}
-                                    className="text-sm leading-6 text-slate-700"
-                                  >
-                                    • {priority}
-                                  </li>
-                                )
-                              )}
-                            </ul>
+                            {resumeResult.resume_improvement_priorities
+                              .length === 0 ? (
+                              <p className="text-sm text-slate-500">
+                                No priorities available.
+                              </p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {resumeResult.resume_improvement_priorities.map(
+                                  (priority, index) => (
+                                    <li
+                                      key={index}
+                                      className="text-sm leading-6 text-slate-700"
+                                    >
+                                      • {priority}
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            )}
                           </div>
                         </div>
 
@@ -1067,21 +1245,375 @@ export default function Home() {
                             Interview Positioning
                           </h3>
 
-                          <ul className="space-y-3">
-                            {resumeResult.interview_positioning.map(
-                              (item, index) => (
-                                <li
-                                  key={index}
-                                  className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"
-                                >
-                                  {item}
-                                </li>
-                              )
-                            )}
-                          </ul>
+                          {resumeResult.interview_positioning.length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                              Interview positioning is not available.
+                            </p>
+                          ) : (
+                            <ul className="space-y-3">
+                              {resumeResult.interview_positioning.map(
+                                (item, index) => (
+                                  <li
+                                    key={index}
+                                    className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"
+                                  >
+                                    {item}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          )}
 
                           <p className="mt-4 text-xs leading-5 text-slate-500">
                             {resumeResult.disclaimer}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeView === "learning" && (
+                  <div className="space-y-6">
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                            Learning & Upskilling Plan
+                          </h2>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            Generate revision topics, new skills, projects,
+                            interview prep and resource guidance for your target
+                            role.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => setActiveView("career")}
+                          className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
+                        >
+                          Back to Career Report
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className={labelClass}>Target Role</label>
+                          {allTargetRoles.length > 0 ? (
+                            <select
+                              className={inputClass}
+                              value={learningTargetRole}
+                              onChange={(e) =>
+                                setLearningTargetRole(e.target.value)
+                              }
+                            >
+                              {allTargetRoles.map((role, index) => (
+                                <option key={index} value={role}>
+                                  {role}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              className={inputClass}
+                              placeholder="e.g. Senior Backend Engineer"
+                              value={learningTargetRole}
+                              onChange={(e) =>
+                                setLearningTargetRole(e.target.value)
+                              }
+                            />
+                          )}
+                        </div>
+
+                        <button
+                          onClick={generateLearningPlan}
+                          disabled={learningLoading}
+                          className="rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                          {learningLoading
+                            ? "Generating learning plan..."
+                            : "Generate Learning Plan"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {learningLoading && (
+                      <div className="rounded-3xl bg-white p-6 text-center shadow">
+                        <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-slate-950"></div>
+                        <h3 className="text-xl font-bold text-slate-900">
+                          Creating your learning plan...
+                        </h3>
+                        <p className="mt-2 text-sm text-slate-500">
+                          Preparing revision topics, new skills, projects and
+                          interview prep for your target role.
+                        </p>
+                      </div>
+                    )}
+
+                    {learningResult && (
+                      <div className="space-y-6">
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            <h3 className="text-2xl font-bold text-slate-900">
+                              Learning Plan Result
+                            </h3>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${getReadinessStyle(
+                                learningResult.readiness_level
+                              )}`}
+                            >
+                              {learningResult.readiness_level} Readiness
+                            </span>
+                          </div>
+
+                          <p className="text-sm leading-6 text-slate-600">
+                            {learningResult.readiness_summary}
+                          </p>
+                        </div>
+
+                        <div className="grid gap-6 md:grid-cols-2">
+                          <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                            <h3 className="mb-4 text-xl font-bold text-slate-900">
+                              Revision Topics
+                            </h3>
+
+                            {learningResult.revision_topics.length === 0 ? (
+                              <p className="text-sm text-slate-500">
+                                No revision topics available.
+                              </p>
+                            ) : (
+                              <ul className="space-y-2">
+                                {learningResult.revision_topics.map(
+                                  (topic, index) => (
+                                    <li
+                                      key={index}
+                                      className="text-sm leading-6 text-slate-700"
+                                    >
+                                      • {topic}
+                                    </li>
+                                  )
+                                )}
+                              </ul>
+                            )}
+                          </div>
+
+                          <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                            <h3 className="mb-4 text-xl font-bold text-slate-900">
+                              New Skills to Learn
+                            </h3>
+
+                            {learningResult.new_skills_to_learn.length === 0 ? (
+                              <p className="text-sm text-slate-500">
+                                No new skills available.
+                              </p>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {learningResult.new_skills_to_learn.map(
+                                  (skill, index) => (
+                                    <span
+                                      key={index}
+                                      className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                    >
+                                      {skill}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-slate-900">
+                            Project Suggestions
+                          </h3>
+
+                          {learningResult.project_suggestions.length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                              No project suggestions available.
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              {learningResult.project_suggestions.map(
+                                (project, index) => (
+                                  <div
+                                    key={index}
+                                    className="rounded-2xl border border-slate-200 p-4"
+                                  >
+                                    <div className="mb-2 flex flex-wrap items-center gap-2">
+                                      <h4 className="text-lg font-bold text-slate-900">
+                                        {project.project_name}
+                                      </h4>
+                                      <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs font-semibold text-indigo-700">
+                                        {project.difficulty}
+                                      </span>
+                                    </div>
+
+                                    <p className="mb-3 text-sm leading-6 text-slate-600">
+                                      {project.description}
+                                    </p>
+
+                                    <p className="mb-2 text-sm font-semibold text-slate-900">
+                                      Skills covered
+                                    </p>
+
+                                    <div className="mb-3 flex flex-wrap gap-2">
+                                      {project.skills_covered.map(
+                                        (skill, skillIndex) => (
+                                          <span
+                                            key={skillIndex}
+                                            className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                          >
+                                            {skill}
+                                          </span>
+                                        )
+                                      )}
+                                    </div>
+
+                                    <p className="text-sm leading-6 text-slate-600">
+                                      <span className="font-semibold">
+                                        Portfolio value:
+                                      </span>{" "}
+                                      {project.portfolio_value}
+                                    </p>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-slate-900">
+                            Interview Prep Topics
+                          </h3>
+
+                          {learningResult.interview_prep_topics.length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                              No interview topics available.
+                            </p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {learningResult.interview_prep_topics.map(
+                                (topic, index) => (
+                                  <li
+                                    key={index}
+                                    className="text-sm leading-6 text-slate-700"
+                                  >
+                                    • {topic}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          )}
+                        </div>
+
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-slate-900">
+                            Resource Guidance
+                          </h3>
+
+                          {learningResult.resource_recommendations.length ===
+                          0 ? (
+                            <p className="text-sm text-slate-500">
+                              No resource guidance available.
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              {learningResult.resource_recommendations.map(
+                                (resource, index) => (
+                                  <div
+                                    key={index}
+                                    className="rounded-2xl border border-slate-200 p-4"
+                                  >
+                                    <p className="font-bold text-slate-900">
+                                      {resource.topic}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                      {resource.resource_type}
+                                    </p>
+                                    <p className="mt-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                                      Search: {resource.what_to_search}
+                                    </p>
+                                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                                      <span className="font-semibold">
+                                        Expected outcome:
+                                      </span>{" "}
+                                      {resource.expected_outcome}
+                                    </p>
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-slate-900">
+                            Weekly Learning Plan
+                          </h3>
+
+                          {Object.keys(learningResult.weekly_learning_plan)
+                            .length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                              Weekly learning plan is not available.
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              {Object.entries(
+                                learningResult.weekly_learning_plan
+                              ).map(([week, tasks]) => (
+                                <div
+                                  key={week}
+                                  className="rounded-2xl border border-slate-200 p-4"
+                                >
+                                  <p className="mb-2 font-bold text-slate-900">
+                                    {week.replace("_", " ").toUpperCase()}
+                                  </p>
+                                  <ul className="space-y-2">
+                                    {(tasks || []).map((task, index) => (
+                                      <li
+                                        key={index}
+                                        className="flex gap-2 text-sm leading-6 text-slate-600"
+                                      >
+                                        <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900"></span>
+                                        <span>{task}</span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="rounded-3xl bg-emerald-50 p-5 shadow-sm sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-emerald-950">
+                            Job Readiness Checklist
+                          </h3>
+
+                          {learningResult.job_readiness_checklist.length ===
+                          0 ? (
+                            <p className="text-sm text-emerald-900">
+                              Checklist is not available.
+                            </p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {learningResult.job_readiness_checklist.map(
+                                (item, index) => (
+                                  <li
+                                    key={index}
+                                    className="text-sm leading-6 text-emerald-900"
+                                  >
+                                    ✅ {item}
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          )}
+
+                          <p className="mt-4 text-xs leading-5 text-emerald-800">
+                            {learningResult.disclaimer}
                           </p>
                         </div>
                       </div>
