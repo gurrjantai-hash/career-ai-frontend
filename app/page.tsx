@@ -37,8 +37,31 @@ type CareerResult = {
   disclaimer: string;
 };
 
+type ResumeBulletImprovement = {
+  original: string;
+  improved: string;
+  reason: string;
+};
+
+type ResumeResult = {
+  target_role: string;
+  resume_alignment: string;
+  alignment_summary: string;
+  improved_profile_summary: string;
+  improved_bullets: ResumeBulletImprovement[];
+  missing_keywords: string[];
+  resume_improvement_priorities: string[];
+  naukri_headline: string;
+  linkedin_summary: string;
+  interview_positioning: string[];
+  disclaimer: string;
+};
+
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
+
+const textAreaClass =
+  "min-h-[220px] w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
 
 const labelClass = "mb-1 block text-sm font-medium text-slate-700";
 
@@ -124,6 +147,43 @@ function normalizeCareerResult(data: any): CareerResult {
   };
 }
 
+function normalizeResumeResult(data: any): ResumeResult {
+  return {
+    target_role: data?.target_role || "Target role not available",
+    resume_alignment: data?.resume_alignment || "Medium",
+    alignment_summary:
+      data?.alignment_summary ||
+      "Resume alignment summary is not available.",
+    improved_profile_summary:
+      data?.improved_profile_summary ||
+      "Improved profile summary is not available.",
+    improved_bullets: Array.isArray(data?.improved_bullets)
+      ? data.improved_bullets.map((bullet: any) => ({
+          original: bullet?.original || "Original bullet not provided",
+          improved: bullet?.improved || "Improved bullet not provided",
+          reason: bullet?.reason || "Reason not provided",
+        }))
+      : [],
+    missing_keywords: Array.isArray(data?.missing_keywords)
+      ? data.missing_keywords
+      : [],
+    resume_improvement_priorities: Array.isArray(
+      data?.resume_improvement_priorities
+    )
+      ? data.resume_improvement_priorities
+      : [],
+    naukri_headline: data?.naukri_headline || "Naukri headline not available.",
+    linkedin_summary:
+      data?.linkedin_summary || "LinkedIn summary not available.",
+    interview_positioning: Array.isArray(data?.interview_positioning)
+      ? data.interview_positioning
+      : [],
+    disclaimer:
+      data?.disclaimer ||
+      "This is AI-generated resume guidance. Please review before using.",
+  };
+}
+
 function getFitScoreStyle(score: string) {
   const normalizedScore = score.toLowerCase();
 
@@ -132,6 +192,20 @@ function getFitScoreStyle(score: string) {
   }
 
   if (normalizedScore.includes("low")) {
+    return "bg-rose-100 text-rose-800";
+  }
+
+  return "bg-amber-100 text-amber-800";
+}
+
+function getAlignmentStyle(alignment: string) {
+  const normalizedAlignment = alignment.toLowerCase();
+
+  if (normalizedAlignment.includes("high")) {
+    return "bg-emerald-100 text-emerald-800";
+  }
+
+  if (normalizedAlignment.includes("low")) {
     return "bg-rose-100 text-rose-800";
   }
 
@@ -151,6 +225,13 @@ export default function Home() {
   const [result, setResult] = useState<CareerResult | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const [activeView, setActiveView] = useState<"career" | "resume">("career");
+
+  const [resumeText, setResumeText] = useState("");
+  const [resumeTargetRole, setResumeTargetRole] = useState("");
+  const [resumeResult, setResumeResult] = useState<ResumeResult | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
+
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -158,6 +239,13 @@ export default function Home() {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const resetResumeState = () => {
+    setResumeText("");
+    setResumeTargetRole("");
+    setResumeResult(null);
+    setResumeLoading(false);
   };
 
   const analyzeCareer = async () => {
@@ -174,6 +262,8 @@ export default function Home() {
 
     setLoading(true);
     setResult(null);
+    setActiveView("career");
+    resetResumeState();
 
     const payload = {
       current_role: form.current_role.trim(),
@@ -193,10 +283,12 @@ export default function Home() {
         payload
       );
 
-      console.log("Career analysis response:", res.data);
-
       const safeResult = normalizeCareerResult(res.data);
       setResult(safeResult);
+
+      if (safeResult.target_roles.length > 0) {
+        setResumeTargetRole(safeResult.target_roles[0]);
+      }
     } catch (error: any) {
       console.error("Career analysis failed:", error);
 
@@ -211,6 +303,74 @@ export default function Home() {
     }
   };
 
+  const optimizeResume = async () => {
+    if (!result) {
+      alert("Please generate career analysis first.");
+      return;
+    }
+
+    if (!resumeTargetRole.trim()) {
+      alert("Please select or enter a target role.");
+      return;
+    }
+
+    if (!resumeText.trim()) {
+      alert("Please paste your resume text.");
+      return;
+    }
+
+    if (resumeText.trim().length < 50) {
+      alert("Please paste more resume details for better analysis.");
+      return;
+    }
+
+    setResumeLoading(true);
+    setResumeResult(null);
+
+    const payload = {
+      current_role: form.current_role.trim(),
+      experience_years: Number(form.experience_years),
+      city: form.city.trim(),
+      skills: form.skills
+        .split(",")
+        .map((skill) => skill.trim())
+        .filter(Boolean),
+      goal: form.goal,
+      target_role: resumeTargetRole.trim(),
+      resume_text: resumeText.trim(),
+    };
+
+    try {
+      const res = await axios.post(
+        `${apiBaseUrl}/api/resume/optimize`,
+        payload
+      );
+
+      const safeResumeResult = normalizeResumeResult(res.data);
+      setResumeResult(safeResumeResult);
+    } catch (error: any) {
+      console.error("Resume optimization failed:", error);
+
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Resume optimization failed. Please try again.";
+
+      alert(message);
+    } finally {
+      setResumeLoading(false);
+    }
+  };
+
+  const allTargetRoles = result
+    ? Array.from(
+        new Set([
+          ...result.target_roles,
+          ...result.growth_paths.flatMap((path) => path.target_roles),
+        ])
+      )
+    : [];
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 sm:py-8">
       <div className="mx-auto max-w-6xl">
@@ -224,9 +384,8 @@ export default function Home() {
           </h1>
 
           <p className="max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-            Enter your current role, salary, city and skills. The AI will
-            analyze your profile, understand your goal, suggest multiple growth
-            paths, and create a practical 4-week roadmap.
+            Analyze your profile, explore growth paths, and improve your resume
+            for your target role.
           </p>
         </section>
 
@@ -341,8 +500,8 @@ export default function Home() {
                     Your analysis will appear here
                   </h2>
                   <p className="mx-auto max-w-md text-sm leading-6 text-slate-500 sm:text-base">
-                    Fill the form and generate your salary gap, growth paths,
-                    skill gaps, target roles and 4-week roadmap.
+                    Fill the form and generate your career report. Resume
+                    optimizer will unlock after analysis.
                   </p>
                 </div>
               </div>
@@ -356,8 +515,8 @@ export default function Home() {
                     Analyzing your income growth path...
                   </h2>
                   <p className="text-sm leading-6 text-slate-500 sm:text-base">
-                    Mapping your role, detecting possible growth paths, and
-                    creating a goal-specific roadmap.
+                    Mapping your role, detecting growth paths, and creating a
+                    goal-specific roadmap.
                   </p>
                 </div>
               </div>
@@ -365,337 +524,570 @@ export default function Home() {
 
             {result && (
               <div className="space-y-6">
-                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                  <div className="mb-4 flex flex-wrap gap-3">
-                    <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-                      {result.role_cluster}
-                    </span>
-                    <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-                      {result.current_level} Level
-                    </span>
-                    <span className="rounded-full bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-700">
-                      Goal: {form.goal}
-                    </span>
-                  </div>
+                <div className="rounded-3xl bg-white p-3 shadow">
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setActiveView("career")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                        activeView === "career"
+                          ? "bg-slate-950 text-white"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      Career Report
+                    </button>
 
-                  <h2 className="mb-3 text-2xl font-bold text-slate-900 sm:text-3xl">
-                    Your Career Analysis
-                  </h2>
-
-                  <p className="text-sm leading-6 text-slate-600 sm:text-base">
-                    {result.summary}
-                  </p>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-3xl bg-slate-950 p-5 text-white shadow sm:p-6">
-                    <p className="mb-2 text-sm text-slate-300">
-                      Current Salary
-                    </p>
-                    <p className="text-3xl font-bold">
-                      ₹{result.salary_insight.current_salary_lpa}L
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                    <p className="mb-2 text-sm text-slate-500">
-                      Market Range
-                    </p>
-                    <p className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                      ₹{result.salary_insight.market_min_lpa}L - ₹
-                      {result.salary_insight.market_max_lpa}L
-                    </p>
-                  </div>
-
-                  <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                    <p className="mb-2 text-sm text-slate-500">Salary Gap</p>
-                    <p className="text-xl font-bold text-slate-900 sm:text-2xl">
-                      {result.salary_insight.salary_gap_lpa}
-                    </p>
+                    <button
+                      onClick={() => setActiveView("resume")}
+                      className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                        activeView === "resume"
+                          ? "bg-slate-950 text-white"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                      }`}
+                    >
+                      Resume Optimizer
+                    </button>
                   </div>
                 </div>
 
-                <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-700">
-                    Goal-Specific Strategy
-                  </p>
-                  <p className="text-sm leading-6 text-indigo-950 sm:text-base">
-                    {result.goal_strategy}
-                  </p>
-                </div>
+                {activeView === "career" && (
+                  <div className="space-y-6">
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <div className="mb-4 flex flex-wrap gap-3">
+                        <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+                          {result.role_cluster}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
+                          {result.current_level} Level
+                        </span>
+                        <span className="rounded-full bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-700">
+                          Goal: {form.goal}
+                        </span>
+                      </div>
 
-                <div className="rounded-3xl bg-emerald-50 p-5 shadow-sm sm:p-6">
-                  <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
-                    Recommended Next Move
-                  </p>
-                  <p className="text-lg font-bold leading-7 text-emerald-950 sm:text-xl">
-                    {result.recommended_next_move}
-                  </p>
-                </div>
+                      <h2 className="mb-3 text-2xl font-bold text-slate-900 sm:text-3xl">
+                        Your Career Analysis
+                      </h2>
 
-                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                  <h3 className="mb-2 text-xl font-bold text-slate-900">
-                    Possible Growth Paths
-                  </h3>
-                  <p className="mb-4 text-sm leading-6 text-slate-500">
-                    These are not fixed answers. They are possible directions
-                    based on your current role, skills and selected goal.
-                  </p>
+                      <p className="text-sm leading-6 text-slate-600 sm:text-base">
+                        {result.summary}
+                      </p>
+                    </div>
 
-                  {result.growth_paths.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      Growth paths are not available.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {result.growth_paths.map((path, index) => (
-                        <div
-                          key={index}
-                          className="rounded-2xl border border-slate-200 p-4"
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <div className="rounded-3xl bg-slate-950 p-5 text-white shadow sm:p-6">
+                        <p className="mb-2 text-sm text-slate-300">
+                          Current Salary
+                        </p>
+                        <p className="text-3xl font-bold">
+                          ₹{result.salary_insight.current_salary_lpa}L
+                        </p>
+                      </div>
+
+                      <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                        <p className="mb-2 text-sm text-slate-500">
+                          Market Range
+                        </p>
+                        <p className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                          ₹{result.salary_insight.market_min_lpa}L - ₹
+                          {result.salary_insight.market_max_lpa}L
+                        </p>
+                      </div>
+
+                      <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                        <p className="mb-2 text-sm text-slate-500">
+                          Salary Gap
+                        </p>
+                        <p className="text-xl font-bold text-slate-900 sm:text-2xl">
+                          {result.salary_insight.salary_gap_lpa}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
+                      <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-700">
+                        Goal-Specific Strategy
+                      </p>
+                      <p className="text-sm leading-6 text-indigo-950 sm:text-base">
+                        {result.goal_strategy}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-emerald-50 p-5 shadow-sm sm:p-6">
+                      <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                        Recommended Next Move
+                      </p>
+                      <p className="text-lg font-bold leading-7 text-emerald-950 sm:text-xl">
+                        {result.recommended_next_move}
+                      </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <h3 className="mb-2 text-xl font-bold text-slate-900">
+                        Possible Growth Paths
+                      </h3>
+                      <p className="mb-4 text-sm leading-6 text-slate-500">
+                        These are possible directions based on your role, skills
+                        and selected goal.
+                      </p>
+
+                      {result.growth_paths.length === 0 ? (
+                        <p className="text-sm text-slate-500">
+                          Growth paths are not available.
+                        </p>
+                      ) : (
+                        <div className="space-y-4">
+                          {result.growth_paths.map((path, index) => (
+                            <div
+                              key={index}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <div className="mb-3 flex flex-wrap items-center gap-2">
+                                <h4 className="text-lg font-bold text-slate-900">
+                                  {path.path_name}
+                                </h4>
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-semibold ${getFitScoreStyle(
+                                    path.fit_score
+                                  )}`}
+                                >
+                                  {path.fit_score} Fit
+                                </span>
+                              </div>
+
+                              <p className="mb-4 text-sm leading-6 text-slate-600">
+                                {path.why_it_fits}
+                              </p>
+
+                              <div className="grid gap-4 sm:grid-cols-2">
+                                <div>
+                                  <p className="mb-2 text-sm font-semibold text-slate-900">
+                                    Target Roles
+                                  </p>
+                                  <ul className="space-y-2">
+                                    {path.target_roles.map(
+                                      (role, roleIndex) => (
+                                        <li
+                                          key={roleIndex}
+                                          className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                                        >
+                                          {role}
+                                        </li>
+                                      )
+                                    )}
+                                  </ul>
+                                </div>
+
+                                <div>
+                                  <p className="mb-2 text-sm font-semibold text-slate-900">
+                                    Skills to Build
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {path.skills_to_build.map(
+                                      (skill, skillIndex) => (
+                                        <span
+                                          key={skillIndex}
+                                          className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                        >
+                                          {skill}
+                                        </span>
+                                      )
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <h3 className="mb-4 text-xl font-bold text-slate-900">
+                        High-ROI Skill Gaps
+                      </h3>
+
+                      <div className="space-y-3">
+                        {result.top_skill_gaps.map((skill, index) => (
+                          <div
+                            key={index}
+                            className="rounded-2xl border border-slate-200 p-4"
+                          >
+                            <p className="font-semibold text-slate-900">
+                              {skill}
+                            </p>
+                            <p className="mt-1 text-sm leading-6 text-slate-600">
+                              {result.skill_salary_impact[skill] ||
+                                "This skill can improve your employability for better-paying roles."}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl bg-slate-900 p-5 text-white shadow sm:p-6">
+                      <h3 className="mb-4 text-xl font-bold">
+                        Why These Recommendations?
+                      </h3>
+
+                      <ul className="space-y-3">
+                        {result.why_recommendations.map((reason, index) => (
+                          <li
+                            key={index}
+                            className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-slate-100"
+                          >
+                            {reason}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <h3 className="mb-4 text-xl font-bold text-slate-900">
+                        4-Week Action Roadmap
+                      </h3>
+
+                      <div className="space-y-4">
+                        {Object.entries(result.roadmap_4_weeks).map(
+                          ([week, tasks]) => (
+                            <div
+                              key={week}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <p className="mb-2 font-bold text-slate-900">
+                                {week.replace("_", " ").toUpperCase()}
+                              </p>
+                              <ul className="space-y-2">
+                                {(tasks || []).map((task, index) => (
+                                  <li
+                                    key={index}
+                                    className="flex gap-2 text-sm leading-6 text-slate-600"
+                                  >
+                                    <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900"></span>
+                                    <span>{task}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <h3 className="mb-4 text-xl font-bold text-slate-900">
+                        Resume Suggestions
+                      </h3>
+
+                      <ul className="space-y-3">
+                        {result.resume_suggestions.map(
+                          (suggestion, index) => (
+                            <li
+                              key={index}
+                              className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"
+                            >
+                              {suggestion}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+
+                    <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
+                      <h3 className="mb-2 text-xl font-bold text-indigo-950">
+                        Ready to improve your resume?
+                      </h3>
+                      <p className="mb-4 text-sm leading-6 text-indigo-900">
+                        Use the Resume Optimizer to rewrite your profile summary,
+                        bullets, Naukri headline and LinkedIn summary for your
+                        target role.
+                      </p>
+
+                      <button
+                        onClick={() => setActiveView("resume")}
+                        className="rounded-xl bg-indigo-700 px-5 py-3 font-semibold text-white transition hover:bg-indigo-800"
+                      >
+                        Go to Resume Optimizer
+                      </button>
+                    </div>
+
+                    <div className="rounded-3xl bg-amber-50 p-5 sm:p-6">
+                      <h3 className="mb-4 text-xl font-bold text-amber-950">
+                        Confidence Notes
+                      </h3>
+
+                      <ul className="space-y-2">
+                        {result.confidence_notes.map((note, index) => (
+                          <li
+                            key={index}
+                            className="text-sm leading-6 text-amber-900"
+                          >
+                            • {note}
+                          </li>
+                        ))}
+                      </ul>
+
+                      <p className="mt-4 text-sm leading-6 text-amber-900">
+                        {result.disclaimer}
+                      </p>
+
+                      <p className="mt-2 text-xs leading-5 text-amber-800">
+                        Salary confidence: {result.salary_insight.confidence}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {activeView === "resume" && (
+                  <div className="space-y-6">
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+                            Resume Optimizer
+                          </h2>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            Paste your resume and optimize it for a specific
+                            target role.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={() => setActiveView("career")}
+                          className="rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
                         >
+                          Back to Career Report
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div>
+                          <label className={labelClass}>Target Role</label>
+                          {allTargetRoles.length > 0 ? (
+                            <select
+                              className={inputClass}
+                              value={resumeTargetRole}
+                              onChange={(e) =>
+                                setResumeTargetRole(e.target.value)
+                              }
+                            >
+                              {allTargetRoles.map((role, index) => (
+                                <option key={index} value={role}>
+                                  {role}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              className={inputClass}
+                              placeholder="e.g. Senior Backend Engineer"
+                              value={resumeTargetRole}
+                              onChange={(e) =>
+                                setResumeTargetRole(e.target.value)
+                              }
+                            />
+                          )}
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Paste Resume Text
+                          </label>
+                          <textarea
+                            className={textAreaClass}
+                            placeholder="Paste your resume text here. Include summary, skills, work experience and projects for best results."
+                            value={resumeText}
+                            onChange={(e) => setResumeText(e.target.value)}
+                          />
+                          <p className="mt-1 text-xs text-slate-500">
+                            For privacy, this MVP does not store your resume
+                            text.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={optimizeResume}
+                          disabled={resumeLoading}
+                          className="rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                          {resumeLoading
+                            ? "Optimizing resume..."
+                            : "Generate Resume Suggestions"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {resumeLoading && (
+                      <div className="rounded-3xl bg-white p-6 text-center shadow">
+                        <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-slate-950"></div>
+                        <h3 className="text-xl font-bold text-slate-900">
+                          Optimizing your resume...
+                        </h3>
+                        <p className="mt-2 text-sm text-slate-500">
+                          Rewriting bullets, finding missing keywords and
+                          preparing your Naukri/LinkedIn positioning.
+                        </p>
+                      </div>
+                    )}
+
+                    {resumeResult && (
+                      <div className="space-y-6">
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
                           <div className="mb-3 flex flex-wrap items-center gap-2">
-                            <h4 className="text-lg font-bold text-slate-900">
-                              {path.path_name}
-                            </h4>
+                            <h3 className="text-2xl font-bold text-slate-900">
+                              Resume Optimization Result
+                            </h3>
                             <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${getFitScoreStyle(
-                                path.fit_score
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${getAlignmentStyle(
+                                resumeResult.resume_alignment
                               )}`}
                             >
-                              {path.fit_score} Fit
+                              {resumeResult.resume_alignment} Alignment
                             </span>
                           </div>
 
-                          <p className="mb-4 text-sm leading-6 text-slate-600">
-                            {path.why_it_fits}
+                          <p className="text-sm leading-6 text-slate-600">
+                            {resumeResult.alignment_summary}
                           </p>
+                        </div>
 
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <div>
-                              <p className="mb-2 text-sm font-semibold text-slate-900">
-                                Target Roles
-                              </p>
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-3 text-xl font-bold text-slate-900">
+                            Improved Profile Summary
+                          </h3>
+                          <p className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                            {resumeResult.improved_profile_summary}
+                          </p>
+                        </div>
 
-                              {path.target_roles.length === 0 ? (
-                                <p className="text-sm text-slate-500">
-                                  No target roles available.
-                                </p>
-                              ) : (
-                                <ul className="space-y-2">
-                                  {path.target_roles.map((role, roleIndex) => (
-                                    <li
-                                      key={roleIndex}
-                                      className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
-                                    >
-                                      {role}
-                                    </li>
-                                  ))}
-                                </ul>
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-slate-900">
+                            Improved Resume Bullets
+                          </h3>
+
+                          {resumeResult.improved_bullets.length === 0 ? (
+                            <p className="text-sm text-slate-500">
+                              No bullet improvements available.
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              {resumeResult.improved_bullets.map(
+                                (bullet, index) => (
+                                  <div
+                                    key={index}
+                                    className="rounded-2xl border border-slate-200 p-4"
+                                  >
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                                      Original / Weak Area
+                                    </p>
+                                    <p className="mb-4 text-sm leading-6 text-slate-600">
+                                      {bullet.original}
+                                    </p>
+
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                      Improved Bullet
+                                    </p>
+                                    <p className="mb-4 rounded-xl bg-emerald-50 p-3 text-sm leading-6 text-emerald-950">
+                                      {bullet.improved}
+                                    </p>
+
+                                    <p className="text-xs leading-5 text-slate-500">
+                                      <span className="font-semibold">
+                                        Why better:
+                                      </span>{" "}
+                                      {bullet.reason}
+                                    </p>
+                                  </div>
+                                )
                               )}
                             </div>
+                          )}
+                        </div>
 
-                            <div>
-                              <p className="mb-2 text-sm font-semibold text-slate-900">
-                                Skills to Build
-                              </p>
+                        <div className="grid gap-6 md:grid-cols-2">
+                          <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                            <h3 className="mb-4 text-xl font-bold text-slate-900">
+                              Missing Keywords
+                            </h3>
 
-                              {path.skills_to_build.length === 0 ? (
-                                <p className="text-sm text-slate-500">
-                                  No skills available.
-                                </p>
-                              ) : (
-                                <div className="flex flex-wrap gap-2">
-                                  {path.skills_to_build.map(
-                                    (skill, skillIndex) => (
-                                      <span
-                                        key={skillIndex}
-                                        className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
-                                      >
-                                        {skill}
-                                      </span>
-                                    )
-                                  )}
-                                </div>
+                            <div className="flex flex-wrap gap-2">
+                              {resumeResult.missing_keywords.map(
+                                (keyword, index) => (
+                                  <span
+                                    key={index}
+                                    className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                  >
+                                    {keyword}
+                                  </span>
+                                )
                               )}
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
 
-                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                  <h3 className="mb-4 text-xl font-bold text-slate-900">
-                    Target Roles
-                  </h3>
+                          <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                            <h3 className="mb-4 text-xl font-bold text-slate-900">
+                              Improvement Priorities
+                            </h3>
 
-                  {result.target_roles.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      No target roles available.
-                    </p>
-                  ) : (
-                    <div className="grid gap-3 sm:grid-cols-3">
-                      {result.target_roles.map((role, index) => (
-                        <div
-                          key={index}
-                          className="rounded-2xl border border-slate-200 p-4"
-                        >
-                          <p className="text-sm text-slate-500">
-                            Option {index + 1}
-                          </p>
-                          <p className="font-semibold text-slate-900">
-                            {role}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                  <h3 className="mb-4 text-xl font-bold text-slate-900">
-                    High-ROI Skill Gaps
-                  </h3>
-
-                  {result.top_skill_gaps.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      No skill gaps available.
-                    </p>
-                  ) : (
-                    <div className="space-y-3">
-                      {result.top_skill_gaps.map((skill, index) => (
-                        <div
-                          key={index}
-                          className="rounded-2xl border border-slate-200 p-4"
-                        >
-                          <p className="font-semibold text-slate-900">
-                            {skill}
-                          </p>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">
-                            {result.skill_salary_impact[skill] ||
-                              "This skill can improve your employability for better-paying roles."}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-3xl bg-slate-900 p-5 text-white shadow sm:p-6">
-                  <h3 className="mb-4 text-xl font-bold">
-                    Why These Recommendations?
-                  </h3>
-
-                  {result.why_recommendations.length === 0 ? (
-                    <p className="text-sm text-slate-300">
-                      Explanation is not available.
-                    </p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {result.why_recommendations.map((reason, index) => (
-                        <li
-                          key={index}
-                          className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-slate-100"
-                        >
-                          {reason}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                  <h3 className="mb-4 text-xl font-bold text-slate-900">
-                    4-Week Action Roadmap
-                  </h3>
-
-                  {Object.keys(result.roadmap_4_weeks).length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      Roadmap is not available.
-                    </p>
-                  ) : (
-                    <div className="space-y-4">
-                      {Object.entries(result.roadmap_4_weeks).map(
-                        ([week, tasks]) => (
-                          <div
-                            key={week}
-                            className="rounded-2xl border border-slate-200 p-4"
-                          >
-                            <p className="mb-2 font-bold text-slate-900">
-                              {week.replace("_", " ").toUpperCase()}
-                            </p>
                             <ul className="space-y-2">
-                              {(tasks || []).map((task, index) => (
-                                <li
-                                  key={index}
-                                  className="flex gap-2 text-sm leading-6 text-slate-600"
-                                >
-                                  <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-slate-900"></span>
-                                  <span>{task}</span>
-                                </li>
-                              ))}
+                              {resumeResult.resume_improvement_priorities.map(
+                                (priority, index) => (
+                                  <li
+                                    key={index}
+                                    className="text-sm leading-6 text-slate-700"
+                                  >
+                                    • {priority}
+                                  </li>
+                                )
+                              )}
                             </ul>
                           </div>
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
+                        </div>
 
-                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                  <h3 className="mb-4 text-xl font-bold text-slate-900">
-                    Resume Suggestions
-                  </h3>
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-3 text-xl font-bold text-slate-900">
+                            Naukri Profile Headline
+                          </h3>
+                          <p className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                            {resumeResult.naukri_headline}
+                          </p>
+                        </div>
 
-                  {result.resume_suggestions.length === 0 ? (
-                    <p className="text-sm text-slate-500">
-                      No resume suggestions available.
-                    </p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {result.resume_suggestions.map((suggestion, index) => (
-                        <li
-                          key={index}
-                          className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"
-                        >
-                          {suggestion}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-3 text-xl font-bold text-slate-900">
+                            LinkedIn About Summary
+                          </h3>
+                          <p className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                            {resumeResult.linkedin_summary}
+                          </p>
+                        </div>
 
-                <div className="rounded-3xl bg-amber-50 p-5 sm:p-6">
-                  <h3 className="mb-4 text-xl font-bold text-amber-950">
-                    Confidence Notes
-                  </h3>
+                        <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                          <h3 className="mb-4 text-xl font-bold text-slate-900">
+                            Interview Positioning
+                          </h3>
 
-                  {result.confidence_notes.length === 0 ? (
-                    <p className="text-sm text-amber-900">
-                      Confidence notes are not available.
-                    </p>
-                  ) : (
-                    <ul className="space-y-2">
-                      {result.confidence_notes.map((note, index) => (
-                        <li
-                          key={index}
-                          className="text-sm leading-6 text-amber-900"
-                        >
-                          • {note}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
+                          <ul className="space-y-3">
+                            {resumeResult.interview_positioning.map(
+                              (item, index) => (
+                                <li
+                                  key={index}
+                                  className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-700"
+                                >
+                                  {item}
+                                </li>
+                              )
+                            )}
+                          </ul>
 
-                  <p className="mt-4 text-sm leading-6 text-amber-900">
-                    {result.disclaimer}
-                  </p>
-
-                  <p className="mt-2 text-xs leading-5 text-amber-800">
-                    Salary confidence: {result.salary_insight.confidence}
-                  </p>
-                </div>
+                          <p className="mt-4 text-xs leading-5 text-slate-500">
+                            {resumeResult.disclaimer}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </section>
