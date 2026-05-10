@@ -11,15 +11,26 @@ type SalaryInsight = {
   confidence: string;
 };
 
+type GrowthPath = {
+  path_name: string;
+  fit_score: string;
+  why_it_fits: string;
+  target_roles: string[];
+  skills_to_build: string[];
+};
+
 type CareerResult = {
   role_cluster: string;
   current_level: string;
   summary: string;
   recommended_next_move: string;
+  goal_strategy: string;
   salary_insight: SalaryInsight;
   target_roles: string[];
   top_skill_gaps: string[];
   skill_salary_impact: Record<string, string>;
+  growth_paths: GrowthPath[];
+  why_recommendations: string[];
   roadmap_4_weeks: Record<string, string[]>;
   resume_suggestions: string[];
   confidence_notes: string[];
@@ -30,6 +41,24 @@ const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
 
 const labelClass = "mb-1 block text-sm font-medium text-slate-700";
+
+function normalizeGrowthPaths(data: any): GrowthPath[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.map((path) => ({
+    path_name: path?.path_name || "Career Growth Path",
+    fit_score: path?.fit_score || "Medium",
+    why_it_fits:
+      path?.why_it_fits ||
+      "This path may fit based on your current role, skills and career goal.",
+    target_roles: Array.isArray(path?.target_roles) ? path.target_roles : [],
+    skills_to_build: Array.isArray(path?.skills_to_build)
+      ? path.skills_to_build
+      : [],
+  }));
+}
 
 function normalizeCareerResult(data: any): CareerResult {
   const salaryInsight = data?.salary_insight || {};
@@ -45,6 +74,10 @@ function normalizeCareerResult(data: any): CareerResult {
     recommended_next_move:
       data?.recommended_next_move ||
       "Recommended next move is not available for this analysis.",
+
+    goal_strategy:
+      data?.goal_strategy ||
+      "Goal-specific strategy is not available for this analysis.",
 
     salary_insight: {
       current_salary_lpa: Number(salaryInsight.current_salary_lpa || 0),
@@ -66,6 +99,12 @@ function normalizeCareerResult(data: any): CareerResult {
         ? data.skill_salary_impact
         : {},
 
+    growth_paths: normalizeGrowthPaths(data?.growth_paths),
+
+    why_recommendations: Array.isArray(data?.why_recommendations)
+      ? data.why_recommendations
+      : [],
+
     roadmap_4_weeks:
       data?.roadmap_4_weeks && typeof data.roadmap_4_weeks === "object"
         ? data.roadmap_4_weeks
@@ -83,6 +122,20 @@ function normalizeCareerResult(data: any): CareerResult {
       data?.disclaimer ||
       "This is an AI-assisted estimate and not a guaranteed salary prediction.",
   };
+}
+
+function getFitScoreStyle(score: string) {
+  const normalizedScore = score.toLowerCase();
+
+  if (normalizedScore.includes("high")) {
+    return "bg-emerald-100 text-emerald-800";
+  }
+
+  if (normalizedScore.includes("low")) {
+    return "bg-rose-100 text-rose-800";
+  }
+
+  return "bg-amber-100 text-amber-800";
 }
 
 export default function Home() {
@@ -167,13 +220,13 @@ export default function Home() {
           </p>
 
           <h1 className="mb-4 max-w-3xl text-3xl font-bold leading-tight sm:text-4xl">
-            Find your salary gap and get a 4-week roadmap to grow your income.
+            Find your salary gap and get a personalized career growth path.
           </h1>
 
           <p className="max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
             Enter your current role, salary, city and skills. The AI will
-            analyze your profile and suggest realistic target roles, high-ROI
-            skills, and a practical execution roadmap.
+            analyze your profile, understand your goal, suggest multiple growth
+            paths, and create a practical 4-week roadmap.
           </p>
         </section>
 
@@ -288,8 +341,8 @@ export default function Home() {
                     Your analysis will appear here
                   </h2>
                   <p className="mx-auto max-w-md text-sm leading-6 text-slate-500 sm:text-base">
-                    Fill the form and generate your salary gap, skill gaps,
-                    target roles and 4-week roadmap.
+                    Fill the form and generate your salary gap, growth paths,
+                    skill gaps, target roles and 4-week roadmap.
                   </p>
                 </div>
               </div>
@@ -303,8 +356,8 @@ export default function Home() {
                     Analyzing your income growth path...
                   </h2>
                   <p className="text-sm leading-6 text-slate-500 sm:text-base">
-                    Mapping your role, estimating salary gap, and creating your
-                    4-week roadmap.
+                    Mapping your role, detecting possible growth paths, and
+                    creating a goal-specific roadmap.
                   </p>
                 </div>
               </div>
@@ -319,6 +372,9 @@ export default function Home() {
                     </span>
                     <span className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
                       {result.current_level} Level
+                    </span>
+                    <span className="rounded-full bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-700">
+                      Goal: {form.goal}
                     </span>
                   </div>
 
@@ -359,6 +415,15 @@ export default function Home() {
                   </div>
                 </div>
 
+                <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
+                  <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-700">
+                    Goal-Specific Strategy
+                  </p>
+                  <p className="text-sm leading-6 text-indigo-950 sm:text-base">
+                    {result.goal_strategy}
+                  </p>
+                </div>
+
                 <div className="rounded-3xl bg-emerald-50 p-5 shadow-sm sm:p-6">
                   <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
                     Recommended Next Move
@@ -366,6 +431,98 @@ export default function Home() {
                   <p className="text-lg font-bold leading-7 text-emerald-950 sm:text-xl">
                     {result.recommended_next_move}
                   </p>
+                </div>
+
+                <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                  <h3 className="mb-2 text-xl font-bold text-slate-900">
+                    Possible Growth Paths
+                  </h3>
+                  <p className="mb-4 text-sm leading-6 text-slate-500">
+                    These are not fixed answers. They are possible directions
+                    based on your current role, skills and selected goal.
+                  </p>
+
+                  {result.growth_paths.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                      Growth paths are not available.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {result.growth_paths.map((path, index) => (
+                        <div
+                          key={index}
+                          className="rounded-2xl border border-slate-200 p-4"
+                        >
+                          <div className="mb-3 flex flex-wrap items-center gap-2">
+                            <h4 className="text-lg font-bold text-slate-900">
+                              {path.path_name}
+                            </h4>
+                            <span
+                              className={`rounded-full px-3 py-1 text-xs font-semibold ${getFitScoreStyle(
+                                path.fit_score
+                              )}`}
+                            >
+                              {path.fit_score} Fit
+                            </span>
+                          </div>
+
+                          <p className="mb-4 text-sm leading-6 text-slate-600">
+                            {path.why_it_fits}
+                          </p>
+
+                          <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                              <p className="mb-2 text-sm font-semibold text-slate-900">
+                                Target Roles
+                              </p>
+
+                              {path.target_roles.length === 0 ? (
+                                <p className="text-sm text-slate-500">
+                                  No target roles available.
+                                </p>
+                              ) : (
+                                <ul className="space-y-2">
+                                  {path.target_roles.map((role, roleIndex) => (
+                                    <li
+                                      key={roleIndex}
+                                      className="rounded-xl bg-slate-50 px-3 py-2 text-sm text-slate-700"
+                                    >
+                                      {role}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+
+                            <div>
+                              <p className="mb-2 text-sm font-semibold text-slate-900">
+                                Skills to Build
+                              </p>
+
+                              {path.skills_to_build.length === 0 ? (
+                                <p className="text-sm text-slate-500">
+                                  No skills available.
+                                </p>
+                              ) : (
+                                <div className="flex flex-wrap gap-2">
+                                  {path.skills_to_build.map(
+                                    (skill, skillIndex) => (
+                                      <span
+                                        key={skillIndex}
+                                        className="rounded-full bg-slate-100 px-3 py-2 text-xs font-medium text-slate-700"
+                                      >
+                                        {skill}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
@@ -422,6 +579,29 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
+                  )}
+                </div>
+
+                <div className="rounded-3xl bg-slate-900 p-5 text-white shadow sm:p-6">
+                  <h3 className="mb-4 text-xl font-bold">
+                    Why These Recommendations?
+                  </h3>
+
+                  {result.why_recommendations.length === 0 ? (
+                    <p className="text-sm text-slate-300">
+                      Explanation is not available.
+                    </p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {result.why_recommendations.map((reason, index) => (
+                        <li
+                          key={index}
+                          className="rounded-2xl bg-white/10 p-4 text-sm leading-6 text-slate-100"
+                        >
+                          {reason}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
 
