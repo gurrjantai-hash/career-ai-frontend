@@ -11,6 +11,14 @@ type SalaryInsight = {
   confidence: string;
 };
 
+type TargetSalaryInsight = {
+  target_role: string;
+  estimated_min_lpa: number;
+  estimated_max_lpa: number;
+  fit_level: string;
+  salary_upside_note: string;
+};
+
 type GrowthPath = {
   path_name: string;
   fit_score: string;
@@ -26,6 +34,7 @@ type CareerResult = {
   recommended_next_move: string;
   goal_strategy: string;
   salary_insight: SalaryInsight;
+  target_salary_insights: TargetSalaryInsight[];
   target_roles: string[];
   top_skill_gaps: string[];
   skill_salary_impact: Record<string, string>;
@@ -111,6 +120,20 @@ function normalizeGrowthPaths(data: any): GrowthPath[] {
   }));
 }
 
+function normalizeTargetSalaryInsights(data: any): TargetSalaryInsight[] {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((item) => ({
+    target_role: item?.target_role || "Target role",
+    estimated_min_lpa: Number(item?.estimated_min_lpa || 0),
+    estimated_max_lpa: Number(item?.estimated_max_lpa || 0),
+    fit_level: item?.fit_level || "Medium",
+    salary_upside_note:
+      item?.salary_upside_note ||
+      "This is an estimated target salary range based on your profile and role fit.",
+  }));
+}
+
 function normalizeCareerResult(data: any): CareerResult {
   const salaryInsight = data?.salary_insight || {};
 
@@ -133,6 +156,9 @@ function normalizeCareerResult(data: any): CareerResult {
       salary_gap_lpa: salaryInsight.salary_gap_lpa || "Not available",
       confidence: salaryInsight.confidence || "Not available",
     },
+    target_salary_insights: normalizeTargetSalaryInsights(
+      data?.target_salary_insights
+    ),
     target_roles: Array.isArray(data?.target_roles) ? data.target_roles : [],
     top_skill_gaps: Array.isArray(data?.top_skill_gaps)
       ? data.top_skill_gaps
@@ -735,6 +761,59 @@ export default function Home() {
                         </p>
                       </div>
                     </div>
+
+                    {result.target_salary_insights.length > 0 && (
+                      <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                        <div className="mb-4">
+                          <h3 className="text-xl font-bold text-slate-900">
+                            Target Salary Potential
+                          </h3>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            These are estimated salary ranges for your recommended
+                            next roles based on your experience, city and role fit.
+                          </p>
+                        </div>
+
+                        <div className="grid gap-4 xl:grid-cols-3">
+                          {result.target_salary_insights.map((item, index) => (
+                            <div
+                              key={`${item.target_role}-${index}`}
+                              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                            >
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <h4 className="text-base font-bold text-slate-900">
+                                  {item.target_role}
+                                </h4>
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-semibold ${getFitScoreStyle(
+                                    item.fit_level
+                                  )}`}
+                                >
+                                  {item.fit_level} Fit
+                                </span>
+                              </div>
+
+                              <p className="text-2xl font-bold text-slate-900">
+                                ₹{item.estimated_min_lpa}L - ₹
+                                {item.estimated_max_lpa}L
+                              </p>
+
+                              <p className="mt-1 text-xs font-medium uppercase tracking-wide text-slate-400">
+                                Target range
+                              </p>
+
+                              <p className="mt-4 text-sm leading-6 text-slate-600">
+                                {item.fit_level?.toLowerCase().includes("high")
+                                  ? "Realistic adjacent move based on your profile."
+                                  : item.fit_level?.toLowerCase().includes("medium")
+                                  ? "Possible transition path. Close key skill gaps first."
+                                  : "Stretch path. Requires stronger preparation first."}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     <div className="rounded-3xl bg-indigo-50 p-5 shadow-sm sm:p-6">
                       <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-indigo-700">
