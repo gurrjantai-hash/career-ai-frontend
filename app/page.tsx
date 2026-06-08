@@ -19,6 +19,16 @@ type TargetSalaryInsight = {
   salary_upside_note: string;
 };
 
+type SkillPremiumInsight = {
+  skill_name: string;
+  premium_score: number;
+  market_relevance: string;
+  learning_difficulty: string;
+  proof_required: string;
+  priority: string;
+  source: string;
+};
+
 type GrowthPath = {
   path_name: string;
   fit_score: string;
@@ -38,6 +48,7 @@ type CareerResult = {
   target_roles: string[];
   top_skill_gaps: string[];
   skill_salary_impact: Record<string, string>;
+  skill_premium_insights: SkillPremiumInsight[];
   growth_paths: GrowthPath[];
   why_recommendations: string[];
   roadmap_4_weeks: Record<string, string[]>;
@@ -134,6 +145,22 @@ function normalizeTargetSalaryInsights(data: any): TargetSalaryInsight[] {
   }));
 }
 
+function normalizeSkillPremiumInsights(data: any): SkillPremiumInsight[] {
+  if (!Array.isArray(data)) return [];
+
+  return data.map((item) => ({
+    skill_name: item?.skill_name || "Skill",
+    premium_score: Number(item?.premium_score || 0),
+    market_relevance: item?.market_relevance || "Medium",
+    learning_difficulty: item?.learning_difficulty || "Medium",
+    proof_required:
+      item?.proof_required ||
+      "Build a small practical project or prepare interview-ready proof for this skill.",
+    priority: item?.priority || "Medium",
+    source: item?.source || "career_analysis",
+  }));
+}
+
 function normalizeCareerResult(data: any): CareerResult {
   const salaryInsight = data?.salary_insight || {};
 
@@ -167,6 +194,9 @@ function normalizeCareerResult(data: any): CareerResult {
       data?.skill_salary_impact && typeof data.skill_salary_impact === "object"
         ? data.skill_salary_impact
         : {},
+    skill_premium_insights: normalizeSkillPremiumInsights(
+      data?.skill_premium_insights
+    ),
     growth_paths: normalizeGrowthPaths(data?.growth_paths),
     why_recommendations: Array.isArray(data?.why_recommendations)
       ? data.why_recommendations
@@ -300,6 +330,15 @@ function getAlignmentStyle(alignment: string) {
 
 function getReadinessStyle(readiness: string) {
   const normalized = readiness.toLowerCase();
+
+  if (normalized.includes("high")) return "bg-emerald-100 text-emerald-800";
+  if (normalized.includes("low")) return "bg-rose-100 text-rose-800";
+
+  return "bg-amber-100 text-amber-800";
+}
+
+function getPriorityStyle(priority: string) {
+  const normalized = priority.toLowerCase();
 
   if (normalized.includes("high")) return "bg-emerald-100 text-emerald-800";
   if (normalized.includes("low")) return "bg-rose-100 text-rose-800";
@@ -778,7 +817,7 @@ export default function Home() {
                           {result.target_salary_insights.map((item, index) => (
                             <div
                               key={`${item.target_role}-${index}`}
-                              className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                              className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4"
                             >
                               <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                                 <h4 className="text-base font-bold text-slate-900">
@@ -925,34 +964,80 @@ export default function Home() {
                       )}
                     </div>
 
-                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
-                      <h3 className="mb-4 text-xl font-bold text-slate-900">
-                        High-ROI Skill Gaps
-                      </h3>
+                    {(result.skill_premium_insights || []).length > 0 && (
+                      <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                        <div className="mb-4">
+                          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                            Skill Premium v2
+                          </p>
+                          <h3 className="text-xl font-bold text-slate-900">
+                            High ROI Skills to Build
+                          </h3>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            These skills are ranked using market relevance,
+                            salary premium and practical proof required for your
+                            role cluster.
+                          </p>
+                        </div>
 
-                      {result.top_skill_gaps.length === 0 ? (
-                        <p className="text-sm text-slate-500">
-                          No skill gaps available.
-                        </p>
-                      ) : (
-                        <div className="space-y-3">
-                          {result.top_skill_gaps.map((skill, index) => (
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {(result.skill_premium_insights || []).map((skill, index) => (
                             <div
-                              key={index}
-                              className="rounded-2xl border border-slate-200 p-4"
+                              key={`${skill.skill_name}-${index}`}
+                              className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4"
                             >
-                              <p className="font-semibold text-slate-900">
-                                {skill}
+                              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <h4 className="text-base font-bold text-slate-900">
+                                  {skill.skill_name}
+                                </h4>
+                                <span
+                                  className={`rounded-full px-3 py-1 text-xs font-semibold ${getPriorityStyle(
+                                    skill.priority
+                                  )}`}
+                                >
+                                  {skill.priority} Priority
+                                </span>
+                              </div>
+
+                              <div className="mb-4 space-y-2">
+                                <div className="min-w-0 rounded-xl bg-white p-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                                      Premium Score
+                                    </p>
+                                    <p className="text-lg font-bold text-slate-900">
+                                      {skill.premium_score}/10
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <div className="min-w-0 rounded-xl bg-white p-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+                                      Difficulty
+                                    </p>
+                                    <p className="max-w-full break-words text-sm font-bold leading-5 text-slate-900">
+                                      {skill.learning_difficulty}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <p className="mb-2 text-sm font-semibold text-slate-900">
+                                Market relevance: {skill.market_relevance}
                               </p>
-                              <p className="mt-1 text-sm leading-6 text-slate-600">
-                                {result.skill_salary_impact[skill] ||
-                                  "This skill can improve your employability for better-paying roles."}
+
+                              <p className="text-sm leading-6 text-slate-600">
+                                <span className="font-semibold">
+                                  Proof to build:
+                                </span>{" "}
+                                {skill.proof_required}
                               </p>
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     <div className="rounded-3xl bg-slate-900 p-5 text-white shadow sm:p-6">
                       <h3 className="mb-4 text-xl font-bold">
