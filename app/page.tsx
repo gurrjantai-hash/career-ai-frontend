@@ -107,6 +107,16 @@ type LearningPlanResult = {
   disclaimer: string;
 };
 
+type FeedbackFormState = {
+  role_mapping_rating: string;
+  salary_realism_rating: string;
+  target_roles_rating: string;
+  skill_recommendations_rating: string;
+  overall_rating: string;
+  would_pay: string;
+  feedback_comment: string;
+};
+
 const inputClass =
   "w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
 
@@ -114,6 +124,16 @@ const textAreaClass =
   "min-h-[220px] w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900";
 
 const labelClass = "mb-1 block text-sm font-medium text-slate-700";
+
+const initialFeedbackForm: FeedbackFormState = {
+  role_mapping_rating: "",
+  salary_realism_rating: "",
+  target_roles_rating: "",
+  skill_recommendations_rating: "",
+  overall_rating: "",
+  would_pay: "",
+  feedback_comment: "",
+};
 
 function normalizeGrowthPaths(data: any): GrowthPath[] {
   if (!Array.isArray(data)) return [];
@@ -373,6 +393,12 @@ export default function Home() {
     useState<LearningPlanResult | null>(null);
   const [learningLoading, setLearningLoading] = useState(false);
 
+  const [feedbackForm, setFeedbackForm] =
+    useState<FeedbackFormState>(initialFeedbackForm);
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -395,6 +421,31 @@ export default function Home() {
     setLearningLoading(false);
   };
 
+  const resetFeedbackState = () => {
+    setFeedbackForm(initialFeedbackForm);
+    setFeedbackSubmitting(false);
+    setFeedbackSubmitted(false);
+    setFeedbackError("");
+  };
+
+  const handleFeedbackChange = (
+    field: keyof FeedbackFormState,
+    value: string
+  ) => {
+    setFeedbackForm((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
+
+    if (feedbackSubmitted) {
+      setFeedbackSubmitted(false);
+    }
+
+    if (feedbackError) {
+      setFeedbackError("");
+    }
+  };
+
   const analyzeCareer = async () => {
     if (
       !form.current_role.trim() ||
@@ -412,6 +463,7 @@ export default function Home() {
     setActiveView("career");
     resetResumeState();
     resetLearningState();
+    resetFeedbackState();
 
     const payload = {
       current_role: form.current_role.trim(),
@@ -554,6 +606,64 @@ export default function Home() {
       alert(message);
     } finally {
       setLearningLoading(false);
+    }
+  };
+
+  const submitFeedback = async () => {
+    if (!result) {
+      alert("Please generate career analysis first.");
+      return;
+    }
+
+    if (
+      !feedbackForm.role_mapping_rating ||
+      !feedbackForm.salary_realism_rating ||
+      !feedbackForm.target_roles_rating ||
+      !feedbackForm.skill_recommendations_rating ||
+      !feedbackForm.overall_rating ||
+      !feedbackForm.would_pay
+    ) {
+      alert("Please answer all required feedback questions before submitting.");
+      return;
+    }
+
+    setFeedbackSubmitting(true);
+    setFeedbackError("");
+
+    const payload = {
+      career_analysis_id: null,
+      user_current_role: form.current_role.trim(),
+      detected_role_cluster: result.role_cluster,
+      user_experience_years: Number(form.experience_years),
+      user_city: form.city.trim(),
+      user_goal: form.goal,
+      role_mapping_rating: feedbackForm.role_mapping_rating,
+      salary_realism_rating: feedbackForm.salary_realism_rating,
+      target_roles_rating: feedbackForm.target_roles_rating,
+      skill_recommendations_rating:
+        feedbackForm.skill_recommendations_rating,
+      overall_rating: Number(feedbackForm.overall_rating),
+      would_pay: feedbackForm.would_pay,
+      feedback_comment: feedbackForm.feedback_comment.trim(),
+    };
+
+    try {
+      const res = await axios.post(`${apiBaseUrl}/api/feedback`, payload);
+
+      if (res.data?.success === false) {
+        throw new Error(res.data?.message || "Feedback submission failed.");
+      }
+
+      setFeedbackSubmitted(true);
+    } catch (error: any) {
+      console.error("Feedback submission failed:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Feedback submission failed. Please try again.";
+      setFeedbackError(message);
+    } finally {
+      setFeedbackSubmitting(false);
     }
   };
 
@@ -1163,6 +1273,201 @@ export default function Home() {
                       <p className="mt-2 text-xs leading-5 text-amber-800">
                         Salary confidence: {result.salary_insight.confidence}
                       </p>
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <div className="mb-5">
+                        <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+                          Feedback
+                        </p>
+                        <h3 className="text-xl font-bold text-slate-900">
+                          Help us improve this career report
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-500">
+                          Your feedback helps validate whether the role mapping,
+                          salary estimate and skill recommendations are useful
+                          for real users.
+                        </p>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                          <label className={labelClass}>
+                            Was the role mapping accurate? *
+                          </label>
+                          <select
+                            className={inputClass}
+                            value={feedbackForm.role_mapping_rating}
+                            onChange={(e) =>
+                              handleFeedbackChange(
+                                "role_mapping_rating",
+                                e.target.value
+                              )
+                            }
+                          >
+                            <option value="">Select feedback</option>
+                            <option value="Accurate">Accurate</option>
+                            <option value="Partially accurate">
+                              Partially accurate
+                            </option>
+                            <option value="Not accurate">Not accurate</option>
+                            <option value="Not sure">Not sure</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Was the salary range realistic? *
+                          </label>
+                          <select
+                            className={inputClass}
+                            value={feedbackForm.salary_realism_rating}
+                            onChange={(e) =>
+                              handleFeedbackChange(
+                                "salary_realism_rating",
+                                e.target.value
+                              )
+                            }
+                          >
+                            <option value="">Select feedback</option>
+                            <option value="Realistic">Realistic</option>
+                            <option value="Slightly high">Slightly high</option>
+                            <option value="Slightly low">Slightly low</option>
+                            <option value="Not realistic">Not realistic</option>
+                            <option value="Not sure">Not sure</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Were the target roles useful? *
+                          </label>
+                          <select
+                            className={inputClass}
+                            value={feedbackForm.target_roles_rating}
+                            onChange={(e) =>
+                              handleFeedbackChange(
+                                "target_roles_rating",
+                                e.target.value
+                              )
+                            }
+                          >
+                            <option value="">Select feedback</option>
+                            <option value="Useful">Useful</option>
+                            <option value="Somewhat useful">
+                              Somewhat useful
+                            </option>
+                            <option value="Not useful">Not useful</option>
+                            <option value="Not sure">Not sure</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Were the skill recommendations useful? *
+                          </label>
+                          <select
+                            className={inputClass}
+                            value={feedbackForm.skill_recommendations_rating}
+                            onChange={(e) =>
+                              handleFeedbackChange(
+                                "skill_recommendations_rating",
+                                e.target.value
+                              )
+                            }
+                          >
+                            <option value="">Select feedback</option>
+                            <option value="Useful">Useful</option>
+                            <option value="Somewhat useful">
+                              Somewhat useful
+                            </option>
+                            <option value="Not useful">Not useful</option>
+                            <option value="Not sure">Not sure</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Overall usefulness rating *
+                          </label>
+                          <select
+                            className={inputClass}
+                            value={feedbackForm.overall_rating}
+                            onChange={(e) =>
+                              handleFeedbackChange(
+                                "overall_rating",
+                                e.target.value
+                              )
+                            }
+                          >
+                            <option value="">Select rating</option>
+                            <option value="5">5 - Very useful</option>
+                            <option value="4">4 - Useful</option>
+                            <option value="3">3 - Average</option>
+                            <option value="2">2 - Low usefulness</option>
+                            <option value="1">1 - Not useful</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className={labelClass}>
+                            Would you pay for resume + roadmap support? *
+                          </label>
+                          <select
+                            className={inputClass}
+                            value={feedbackForm.would_pay}
+                            onChange={(e) =>
+                              handleFeedbackChange("would_pay", e.target.value)
+                            }
+                          >
+                            <option value="">Select option</option>
+                            <option value="Yes">Yes</option>
+                            <option value="Maybe">Maybe</option>
+                            <option value="No">No</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="mt-4">
+                        <label className={labelClass}>
+                          Any comment or missing expectation?
+                        </label>
+                        <textarea
+                          className="min-h-[110px] w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900 placeholder:text-slate-400 outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
+                          placeholder="Example: Salary range looks high for my city, or target roles are useful but roadmap needs more project detail."
+                          value={feedbackForm.feedback_comment}
+                          onChange={(e) =>
+                            handleFeedbackChange(
+                              "feedback_comment",
+                              e.target.value
+                            )
+                          }
+                        />
+                      </div>
+
+                      {feedbackError && (
+                        <p className="mt-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+                          {feedbackError}
+                        </p>
+                      )}
+
+                      {feedbackSubmitted && (
+                        <p className="mt-4 rounded-xl bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                          Thank you. Your feedback has been saved.
+                        </p>
+                      )}
+
+                      <button
+                        onClick={submitFeedback}
+                        disabled={feedbackSubmitting || feedbackSubmitted}
+                        className="mt-5 rounded-xl bg-slate-950 px-5 py-3 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                      >
+                        {feedbackSubmitting
+                          ? "Submitting feedback..."
+                          : feedbackSubmitted
+                          ? "Feedback Submitted"
+                          : "Submit Feedback"}
+                      </button>
                     </div>
                   </div>
                 )}
