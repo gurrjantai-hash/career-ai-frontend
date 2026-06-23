@@ -38,6 +38,7 @@ type GrowthPath = {
 };
 
 type CareerResult = {
+  analysis_id?: string | null
   role_cluster: string;
   current_level: string;
   summary: string;
@@ -185,6 +186,7 @@ function normalizeCareerResult(data: any): CareerResult {
   const salaryInsight = data?.salary_insight || {};
 
   return {
+    analysis_id: data?.analysis_id || null,
     role_cluster: data?.role_cluster || "Unknown",
     current_level: data?.current_level || "Not available",
     summary:
@@ -631,7 +633,7 @@ export default function Home() {
     setFeedbackError("");
 
     const payload = {
-      career_analysis_id: null,
+      career_analysis_id: result?.analysis_id || null,
       user_current_role: form.current_role.trim(),
       detected_role_cluster: result.role_cluster,
       user_experience_years: Number(form.experience_years),
