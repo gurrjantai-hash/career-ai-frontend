@@ -38,7 +38,7 @@ type GrowthPath = {
 };
 
 type CareerResult = {
-  analysis_id?: string | null
+  analysis_id?: string | null;
   role_cluster: string;
   current_level: string;
   summary: string;
@@ -106,6 +106,27 @@ type LearningPlanResult = {
   weekly_learning_plan: Record<string, string[]>;
   job_readiness_checklist: string[];
   disclaimer: string;
+};
+
+
+type ExecutionTask = {
+  task_id: string;
+  week_key: string;
+  task_order: number;
+  task_text: string;
+  is_completed: boolean;
+  completed_at?: string | null;
+};
+
+type ExecutionPlanResult = {
+  success: boolean;
+  execution_plan_id: string | null;
+  career_analysis_id: string | null;
+  target_role: string | null;
+  role_cluster: string | null;
+  progress_percentage: number;
+  tasks: ExecutionTask[];
+  message: string;
 };
 
 type FeedbackFormState = {
@@ -332,6 +353,40 @@ function normalizeLearningPlanResult(data: any): LearningPlanResult {
   };
 }
 
+
+function normalizeExecutionPlan(data: any): ExecutionPlanResult {
+  return {
+    success: Boolean(data?.success),
+    execution_plan_id: data?.execution_plan_id || null,
+    career_analysis_id: data?.career_analysis_id || null,
+    target_role: data?.target_role || null,
+    role_cluster: data?.role_cluster || null,
+    progress_percentage: Number(data?.progress_percentage || 0),
+    tasks: Array.isArray(data?.tasks)
+      ? data.tasks.map((task: any) => ({
+          task_id: task?.task_id || "",
+          week_key: task?.week_key || "week_1",
+          task_order: Number(task?.task_order || 0),
+          task_text: task?.task_text || "",
+          is_completed: Boolean(task?.is_completed),
+          completed_at: task?.completed_at || null,
+        }))
+      : [],
+    message: data?.message || "",
+  };
+}
+
+function groupExecutionTasksByWeek(tasks: ExecutionTask[]) {
+  return tasks.reduce<Record<string, ExecutionTask[]>>((acc, task) => {
+    if (!acc[task.week_key]) {
+      acc[task.week_key] = [];
+    }
+
+    acc[task.week_key].push(task);
+    return acc;
+  }, {});
+}
+
 function getFitScoreStyle(score: string) {
   const normalized = score.toLowerCase();
 
@@ -401,6 +456,12 @@ export default function Home() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackError, setFeedbackError] = useState("");
 
+  const [executionPlan, setExecutionPlan] =
+    useState<ExecutionPlanResult | null>(null);
+  const [executionLoading, setExecutionLoading] = useState(false);
+  const [executionUpdatingTaskId, setExecutionUpdatingTaskId] = useState("");
+  const [executionError, setExecutionError] = useState("");
+
   const apiBaseUrl =
     process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
@@ -428,6 +489,13 @@ export default function Home() {
     setFeedbackSubmitting(false);
     setFeedbackSubmitted(false);
     setFeedbackError("");
+  };
+
+  const resetExecutionState = () => {
+    setExecutionPlan(null);
+    setExecutionLoading(false);
+    setExecutionUpdatingTaskId("");
+    setExecutionError("");
   };
 
   const handleFeedbackChange = (
@@ -466,6 +534,7 @@ export default function Home() {
     resetResumeState();
     resetLearningState();
     resetFeedbackState();
+    resetExecutionState();
 
     const payload = {
       current_role: form.current_role.trim(),
@@ -608,6 +677,63 @@ export default function Home() {
       alert(message);
     } finally {
       setLearningLoading(false);
+    }
+  };
+
+  const createExecutionPlan = async () => {
+    if (!result?.analysis_id) {
+      alert("Please generate a career analysis first.");
+      return;
+    }
+
+    setExecutionLoading(true);
+    setExecutionError("");
+
+    try {
+      const res = await axios.post(`${apiBaseUrl}/api/execution/plan`, {
+        career_analysis_id: result.analysis_id,
+      });
+
+      setExecutionPlan(normalizeExecutionPlan(res.data));
+    } catch (error: any) {
+      console.error("Execution plan creation failed:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Execution plan creation failed. Please try again.";
+      setExecutionError(message);
+    } finally {
+      setExecutionLoading(false);
+    }
+  };
+
+  const updateExecutionTask = async (
+    taskId: string,
+    isCompleted: boolean
+  ) => {
+    if (!taskId) return;
+
+    setExecutionUpdatingTaskId(taskId);
+    setExecutionError("");
+
+    try {
+      const res = await axios.patch(
+        `${apiBaseUrl}/api/execution/tasks/${taskId}`,
+        {
+          is_completed: isCompleted,
+        }
+      );
+
+      setExecutionPlan(normalizeExecutionPlan(res.data));
+    } catch (error: any) {
+      console.error("Execution task update failed:", error);
+      const message =
+        error?.response?.data?.detail ||
+        error?.message ||
+        "Task update failed. Please try again.";
+      setExecutionError(message);
+    } finally {
+      setExecutionUpdatingTaskId("");
     }
   };
 
@@ -1209,6 +1335,127 @@ export default function Home() {
                             )
                           )}
                         </div>
+                      )}
+                    </div>
+
+                    <div className="rounded-3xl bg-white p-5 shadow sm:p-6">
+                      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-emerald-700">
+                            Execution Tracker
+                          </p>
+                          <h3 className="text-xl font-bold text-slate-900">
+                            Turn your roadmap into a weekly checklist
+                          </h3>
+                          <p className="mt-2 text-sm leading-6 text-slate-500">
+                            Create a saved 4-week execution plan and mark your
+                            progress as you complete tasks.
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={createExecutionPlan}
+                          disabled={executionLoading || !result?.analysis_id}
+                          className="rounded-xl bg-emerald-700 px-5 py-3 font-semibold text-white transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+                        >
+                          {executionLoading
+                            ? "Creating plan..."
+                            : executionPlan
+                            ? "Refresh Plan"
+                            : "Create My Execution Plan"}
+                        </button>
+                      </div>
+
+                      {executionError && (
+                        <p className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
+                          {executionError}
+                        </p>
+                      )}
+
+                      {executionPlan && (
+                        <div className="space-y-5">
+                          <div className="rounded-2xl bg-slate-50 p-4">
+                            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                              <p className="font-bold text-slate-900">
+                                Progress: {executionPlan.progress_percentage}%
+                              </p>
+                              <p className="text-sm text-slate-500">
+                                Target role:{" "}
+                                {executionPlan.target_role || "Not available"}
+                              </p>
+                            </div>
+
+                            <div className="h-3 overflow-hidden rounded-full bg-slate-200">
+                              <div
+                                className="h-full rounded-full bg-emerald-600 transition-all"
+                                style={{
+                                  width: `${Math.min(
+                                    Math.max(
+                                      executionPlan.progress_percentage,
+                                      0
+                                    ),
+                                    100
+                                  )}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          {Object.entries(
+                            groupExecutionTasksByWeek(executionPlan.tasks)
+                          ).map(([week, tasks]) => (
+                            <div
+                              key={week}
+                              className="rounded-2xl border border-slate-200 p-4"
+                            >
+                              <p className="mb-3 font-bold text-slate-900">
+                                {week.replace("_", " ").toUpperCase()}
+                              </p>
+
+                              <div className="space-y-3">
+                                {tasks.map((task) => (
+                                  <label
+                                    key={task.task_id}
+                                    className={`flex cursor-pointer gap-3 rounded-xl p-3 transition ${
+                                      task.is_completed
+                                        ? "bg-emerald-50 text-emerald-950"
+                                        : "bg-slate-50 text-slate-700"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={task.is_completed}
+                                      disabled={
+                                        executionUpdatingTaskId === task.task_id
+                                      }
+                                      onChange={(e) =>
+                                        updateExecutionTask(
+                                          task.task_id,
+                                          e.target.checked
+                                        )
+                                      }
+                                      className="mt-1 h-4 w-4 shrink-0"
+                                    />
+                                    <span
+                                      className={`text-sm leading-6 ${
+                                        task.is_completed ? "line-through" : ""
+                                      }`}
+                                    >
+                                      {task.task_text}
+                                    </span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {!executionPlan && !executionLoading && (
+                        <p className="rounded-2xl bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+                          Your saved checklist will appear here after you create
+                          an execution plan.
+                        </p>
                       )}
                     </div>
 
