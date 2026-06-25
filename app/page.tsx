@@ -383,8 +383,39 @@ function groupExecutionTasksByWeek(tasks: ExecutionTask[]) {
     }
 
     acc[task.week_key].push(task);
+    acc[task.week_key].sort((a, b) => a.task_order - b.task_order);
     return acc;
   }, {});
+}
+
+function getWeekNumber(weekKey: string) {
+  const match = weekKey.match(/\d+/);
+  return match ? Number(match[0]) : 999;
+}
+
+function isExecutionWeekUnlocked(weekKey: string, tasks: ExecutionTask[]) {
+  const currentWeekNumber = getWeekNumber(weekKey);
+
+  if (currentWeekNumber <= 1) {
+    return true;
+  }
+
+  const previousWeekTasks = tasks.filter(
+    (task) => getWeekNumber(task.week_key) < currentWeekNumber
+  );
+
+  if (previousWeekTasks.length === 0) {
+    return true;
+  }
+
+  return previousWeekTasks.every((task) => task.is_completed);
+}
+
+function calculateExecutionProgress(tasks: ExecutionTask[]) {
+  if (!tasks.length) return 0;
+
+  const completedTasks = tasks.filter((task) => task.is_completed).length;
+  return Number(((completedTasks * 100) / tasks.length).toFixed(2));
 }
 
 function getFitScoreStyle(score: string) {
@@ -711,8 +742,28 @@ export default function Home() {
     taskId: string,
     isCompleted: boolean
   ) => {
-    if (!taskId) return;
+    if (!taskId || !executionPlan) return;
 
+    const previousPlan = executionPlan;
+
+    const optimisticTasks = executionPlan.tasks.map((task) =>
+      task.task_id === taskId
+        ? {
+            ...task,
+            is_completed: isCompleted,
+            completed_at: isCompleted ? new Date().toISOString() : null,
+          }
+        : task
+    );
+
+    const optimisticPlan = {
+      ...executionPlan,
+      tasks: optimisticTasks,
+      progress_percentage: calculateExecutionProgress(optimisticTasks),
+    };
+
+    // Update UI immediately so the checkbox and strike-through feel instant.
+    setExecutionPlan(optimisticPlan);
     setExecutionUpdatingTaskId(taskId);
     setExecutionError("");
 
@@ -724,13 +775,19 @@ export default function Home() {
         }
       );
 
+      // Sync with the authoritative backend response.
       setExecutionPlan(normalizeExecutionPlan(res.data));
     } catch (error: any) {
       console.error("Execution task update failed:", error);
+
+      // Roll back UI if backend rejects the update.
+      setExecutionPlan(previousPlan);
+
       const message =
         error?.response?.data?.detail ||
         error?.message ||
         "Task update failed. Please try again.";
+
       setExecutionError(message);
     } finally {
       setExecutionUpdatingTaskId("");
@@ -1403,51 +1460,97 @@ export default function Home() {
 
                           {Object.entries(
                             groupExecutionTasksByWeek(executionPlan.tasks)
-                          ).map(([week, tasks]) => (
-                            <div
-                              key={week}
-                              className="rounded-2xl border border-slate-200 p-4"
-                            >
-                              <p className="mb-3 font-bold text-slate-900">
-                                {week.replace("_", " ").toUpperCase()}
-                              </p>
+                          )
+                            .sort(
+                              ([weekA], [weekB]) =>
+                                getWeekNumber(weekA) - getWeekNumber(weekB)
+                            )
+                            .map(([week, tasks]) => (
+                              <div
+                                key={week}
+                                className={`rounded-2xl border p-4 ${
+                                  isExecutionWeekUnlocked(
+                                    week,
+                                    executionPlan.tasks
+                                  )
+                                    ? "border-slate-200"
+                                    : "border-amber-200 bg-amber-50/40"
+                                }`}
+                              >
+                                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                  <p className="font-bold text-slate-900">
+                                    {week.replace("_", " ").toUpperCase()}
+                                  </p>
 
-                              <div className="space-y-3">
-                                {tasks.map((task) => (
-                                  <label
-                                    key={task.task_id}
-                                    className={`flex cursor-pointer gap-3 rounded-xl p-3 transition ${
-                                      task.is_completed
-                                        ? "bg-emerald-50 text-emerald-950"
-                                        : "bg-slate-50 text-slate-700"
-                                    }`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={task.is_completed}
-                                      disabled={
-                                        executionUpdatingTaskId === task.task_id
-                                      }
-                                      onChange={(e) =>
-                                        updateExecutionTask(
-                                          task.task_id,
-                                          e.target.checked
-                                        )
-                                      }
-                                      className="mt-1 h-4 w-4 shrink-0"
-                                    />
-                                    <span
-                                      className={`text-sm leading-6 ${
-                                        task.is_completed ? "line-through" : ""
-                                      }`}
-                                    >
-                                      {task.task_text}
+                                  {!isExecutionWeekUnlocked(
+                                    week,
+                                    executionPlan.tasks
+                                  ) && (
+                                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                                      Locked
                                     </span>
-                                  </label>
-                                ))}
+                                  )}
+                                </div>
+
+                                {!isExecutionWeekUnlocked(
+                                  week,
+                                  executionPlan.tasks
+                                ) && (
+                                  <p className="mb-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
+                                    Complete previous week tasks to unlock this week.
+                                  </p>
+                                )}
+
+                                <div className="space-y-3">
+                                  {tasks.map((task) => {
+                                    const isLocked =
+                                      !task.is_completed &&
+                                      !isExecutionWeekUnlocked(
+                                        task.week_key,
+                                        executionPlan.tasks
+                                      );
+
+                                    return (
+                                      <label
+                                        key={task.task_id}
+                                        className={`flex gap-3 rounded-xl p-3 transition ${
+                                          task.is_completed
+                                            ? "bg-emerald-50 text-emerald-950"
+                                            : isLocked
+                                            ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                                            : "cursor-pointer bg-slate-50 text-slate-700"
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={task.is_completed}
+                                          disabled={
+                                            executionUpdatingTaskId ===
+                                              task.task_id || isLocked
+                                          }
+                                          onChange={(e) =>
+                                            updateExecutionTask(
+                                              task.task_id,
+                                              e.target.checked
+                                            )
+                                          }
+                                          className="mt-1 h-4 w-4 shrink-0"
+                                        />
+                                        <span
+                                          className={`text-sm leading-6 ${
+                                            task.is_completed
+                                              ? "line-through"
+                                              : ""
+                                          }`}
+                                        >
+                                          {task.task_text}
+                                        </span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
                         </div>
                       )}
 
